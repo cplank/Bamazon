@@ -1,7 +1,7 @@
 const mysql = require("mysql");
 const inquirer = require("inquirer");
 
-let pool = mysql.createPool({
+let connection = mysql.createConnection({
     connectionLimit: 10,
     host: "localhost",
     port: 3306,
@@ -20,20 +20,22 @@ class Query {
     }
 }
 
-function queryChain(pool, queryArray, index) {
+function queryChain(connection, queryArray, index, finishedCallback) {
     if (index >= queryArray.length) {
-        return console.log("End of the array");
+        connection.end();
+        finishedCallback();
+        return;
     }
     let currentQuery = queryArray[index];
     console.log('````````````````````````````````````````````````````')
     console.log("We're at", index)
 
-    pool.query(currentQuery.queryStr, currentQuery.vals, function (err, result, fields) {
+    connection.query(currentQuery.queryStr, currentQuery.vals, function (err, result, fields) {
         let success = currentQuery.handleResponse(err, result, fields);
         if (!success) {
             return console.log("bad news", err);
         }
-        queryChain(pool, queryArray, index + 1);
+        queryChain(connection, queryArray, index + 1, finishedCallback);
     })
 }
 
@@ -53,6 +55,7 @@ function makeQueries() {
     department_name VARCHAR(100),
     price INT(10) NOT NULL,
     stock_quantity INT (10) NOT NULL)`, diagnostic));
+
     queries.push(new Query("INSERT INTO products (product_name, department_name, price, stock_quantity) VALUES ?", handleResponse, [[
         ["rose", "floral", 12, 72],
         ["daisy", "floral", 5, 120],
@@ -65,6 +68,10 @@ function makeQueries() {
         ["umbrella academy", "comics", 50, 20],
         ["y the last man", "comics", 35, 15]
     ]]))
+    queries.push(new Query("SELECT * FROM products", function (err, result, fields) {
+        console.table(result)
+        return true;
+    }))
     return queries;
 };
 
@@ -121,4 +128,43 @@ function handleResponse(err, result, fields) {
 
 
 
-queryChain(pool, makeQueries(), 0);
+queryChain(connection, makeQueries(), 0, onChainComplete);
+
+
+
+
+
+function onChainComplete() {
+
+    inquirer.prompt([
+        {
+            type: "input",
+            message: "What is the ID of the product you'd like to purchase?",
+            name: "product"
+        }
+    ])
+        .then(function (response) {
+            let chosenProductID = response;
+            inquirer.prompt([
+                {
+                    type: "input",
+                    message: "How much of this product do you want?",
+                    name: "product amount"
+                }
+            ])
+                .then(function (response) {
+                    let productAmount = response;
+                    connection.query(chosenProductID, productAmount)
+                })
+        })
+
+}
+
+class Product {
+    constructor(product_name, department_name, price, stock_quantity) {
+        this.product_name = product_name;
+        this.department_name = department_name;
+        this.price = price;
+        this.stock_quantity = stock_quantity;
+    }
+}
