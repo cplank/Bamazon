@@ -22,8 +22,11 @@ class Query {
 
 function queryChain(connection, queryArray, index, finishedCallback) {
     if (index >= queryArray.length) {
-        connection.end();
-        finishedCallback();
+        //connection.end();
+        if (finishedCallback) {
+            finishedCallback();
+        }
+
         return;
     }
     let currentQuery = queryArray[index];
@@ -70,6 +73,7 @@ function makeQueries() {
     ]]))
     queries.push(new Query("SELECT * FROM products", function (err, result, fields) {
         console.table(result)
+        onChainComplete(result);
         return true;
     }))
     return queries;
@@ -128,13 +132,13 @@ function handleResponse(err, result, fields) {
 
 
 
-queryChain(connection, makeQueries(), 0, onChainComplete);
+queryChain(connection, makeQueries(), 0);
 
 
 
 
 
-function onChainComplete() {
+function onChainComplete(table) {
 
     inquirer.prompt([
         {
@@ -144,20 +148,54 @@ function onChainComplete() {
         }
     ])
         .then(function (response) {
-            let chosenProductID = response;
+            let chosenProductID = Number.parseInt(response.product);
+            console.log(response, typeof (response));
             inquirer.prompt([
                 {
                     type: "input",
                     message: "How much of this product do you want?",
-                    name: "product amount"
+                    name: "product_amount"
                 }
             ])
                 .then(function (response) {
-                    let productAmount = response;
-                    connection.query(chosenProductID, productAmount)
+                    let productAmount = Number.parseInt(response.product_amount);
+                    console.log('requested', chosenProductID)
+                    for (let i = 0; i < table.length; i++) {
+                        // console.log("checking", table[i])
+                        if (chosenProductID === table[i].item_id) {
+                            // console.log('found', table[i][1])
+                            let currentStock = table[i].stock_quantity;
+                            if (currentStock < productAmount) {
+                                console.log("Insuffiencent Quantity")
+                                connection.end();
+                                return;
+
+                            } else {
+                                console.log('making purchase')
+                                let totalCost = table[i].price * productAmount;
+                                console.log("Your total comes to:", totalCost);
+                                let updatedStockAmount = currentStock - productAmount;
+                                //update teh database with the updatedStockAmount in the 
+                                //stock quantity place
+                                connection.query(
+                                    `UPDATE products SET stock_quantity = ${updatedStockAmount} WHERE item_id = ${chosenProductID}`,
+                                    function () {
+                                        connection.query(
+                                            "SELECT * FROM products", function (err, results, fields) {
+                                                console.table(results);
+                                                connection.end();
+                                            }
+                                        )
+                                    }
+                                );
+                            }
+                        }
+
+                    }
+                    //connection.query(chosenProductID, productAmount)
                 })
         })
-
+    return true;
 }
 
 class Product {
