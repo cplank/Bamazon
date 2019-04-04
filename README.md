@@ -15,7 +15,13 @@ This app has the following dependencies:
 
 ## Using Bamazon ##
 
-Just follow the prompts to see items available for purchase and to make purchases.
+Navigate into the `Bamazon` directory and run `node bamazon.js`. Then follow the prompts in the terminal.
+
+You'll need MySQL installed and steup on your local machine.
+
+Clone the repo locall from `https://github.com/cplank/Bamazon.git` and run `npm install` to install the MySQL and Inquirer dependencies. 
+
+This app dynamically creates the Bamazon_db, so you don't need to run a separate `.sql` file. 
 
 ### When you first run Bamazon ###
 
